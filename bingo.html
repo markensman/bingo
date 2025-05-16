@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Wellness Bingo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        .bingo-card-cell {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border: 1px solid #d1d5db; /* Gray border */
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-size: 0.75rem; /* Smaller font for more text */
+            padding: 4px;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+            background-color: #ffffff; /* White cell background */
+            border-radius: 0.375rem; /* Rounded corners */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .bingo-card-cell.marked {
+            background-color: #60a5fa; /* Blue for marked */
+            color: white;
+            transform: scale(0.95);
+        }
+        .bingo-card-cell.free-space {
+            background-color: #34d399; /* Green for free space */
+            color: white;
+            font-weight: bold;
+        }
+        .bingo-card-cell.bingo-line {
+            background-color: #f59e0b; /* Amber for bingo line */
+            color: white;
+            font-weight: bold;
+        }
+        .button-primary {
+            background-color: #3b82f6; /* Blue button */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .button-primary:hover {
+            background-color: #2563eb; /* Darker blue on hover */
+        }
+        .button-secondary {
+            background-color: #10b981; /* Emerald button */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .button-secondary:hover {
+            background-color: #059669; /* Darker emerald on hover */
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+        }
+        #calledWordsListContainer {
+            max-height: 400px; /* Adjust as needed */
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="container mx-auto max-w-6xl space-y-8">
+        <section id="hostView" class="bg-white p-6 rounded-lg shadow-lg">
+            <h1 class="text-3xl font-bold text-center mb-6 text-blue-600">Wellness Bingo - Host Panel</h1>
+            
+            <div class="grid md:grid-cols-3 gap-6 mb-6">
+                <div class="md:col-span-2 bg-blue-50 p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-2 text-blue-700">Current Word & Prompt:</h2>
+                    <div id="currentWordDisplay" class="text-2xl font-bold text-gray-800 min-h-[3rem] mb-2 p-3 bg-white rounded-md border border-blue-200">
+                        Click "Next Word" to start
+                    </div>
+                    <div id="currentPromptDisplay" class="text-md text-gray-600 min-h-[4rem] p-3 bg-white rounded-md border border-blue-200">
+                        Discussion prompt will appear here.
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-2 text-gray-700">QR Code for Players</h2>
+                    <div id="qrcodeDisplay" class="flex justify-center items-center h-40 w-40 mx-auto border rounded-md bg-white">
+                        </div>
+                    <p class="text-xs text-center mt-2 text-gray-500">In a multi-device setup, players scan this to get their unique bingo card on their phone.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="flex-grow">
+                     <button id="nextWordButton" class="button-primary w-full md:w-auto">Next Word</button>
+                     <p id="wordsRemaining" class="text-sm text-gray-500 mt-2"></p>
+                </div>
+                <div class="md:w-1/3 bg-gray-50 p-4 rounded-lg shadow" id="calledWordsListContainer">
+                    <h3 class="text-lg font-semibold mb-2 text-gray-700">Called Words:</h3>
+                    <ul id="calledWordsList" class="list-disc list-inside space-y-1 text-sm text-gray-600">
+                        </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="playerView" class="bg-white p-6 rounded-lg shadow-lg mt-8">
+            <h1 class="text-3xl font-bold text-center mb-6 text-emerald-600">Player Bingo Card</h1>
+            <div class="text-center mb-6">
+                <button id="generateCardButton" class="button-secondary">Generate My Bingo Card</button>
+            </div>
+            <div id="bingoCardGrid" class="grid grid-cols-5 gap-1 md:gap-2 mx-auto w-full max-w-md md:max-w-lg">
+                </div>
+            <div id="bingoMessage" class="hidden mt-6 p-4 bg-yellow-300 text-yellow-800 text-2xl font-bold text-center rounded-lg shadow">
+                BINGO!
+            </div>
+        </section>
+    </div>
+
+    <div id="bingoModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 class="text-4xl font-bold text-yellow-500 mb-4">🎉 BINGO! 🎉</h2>
+            <p class="text-lg text-gray-700 mb-6">You've got 5 in a row!</p>
+            <button id="closeBingoModal" class="button-primary">Keep Playing!</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Data ---
+        const allWordsAndPrompts = [
+            { category: "Nutrition & Healthy Eating", word: "Colorful fruits", prompt: "Which colors did you eat on your plate today?" },
+            { category: "Nutrition & Healthy Eating", word: "Green veggies", prompt: "Name one green veggie you added to your meal." },
+            { category: "Nutrition & Healthy Eating", word: "Orange veggies", prompt: "Did you try any bright orange veggies today? Which one?" },
+            { category: "Nutrition & Healthy Eating", word: "Fresh salad", prompt: "What’s your favorite salad topping or dressing?" },
+            { category: "Nutrition & Healthy Eating", word: "Protein snack", prompt: "What protein-rich snack powered you up?" },
+            { category: "Nutrition & Healthy Eating", word: "Whole grain bread", prompt: "Which whole-grain bread did you enjoy?" },
+            { category: "Nutrition & Healthy Eating", word: "Dairy or dairy-alternative", prompt: "Did you grab a dairy or non-dairy option? Which?" },
+            { category: "Nutrition & Healthy Eating", word: "Nut butter spoonful", prompt: "Peanut or almond… which nut butter did you choose?" },
+            { category: "Nutrition & Healthy Eating", word: "Took prenatal vitamin", prompt: "Did you remember your prenatal vitamin dose today?" },
+            { category: "Nutrition & Healthy Eating", word: "Iron-rich snack", prompt: "What iron-rich food gave you energy?" },
+            { category: "Nutrition & Healthy Eating", word: "Calcium boost", prompt: "How did you get your calcium boost today?" },
+            { category: "Nutrition & Healthy Eating", word: "Folic acid food", prompt: "Name a folate-rich food you ate." },
+            { category: "Nutrition & Healthy Eating", word: "Lean protein meal", prompt: "What lean protein was on your plate?" },
+            { category: "Nutrition & Healthy Eating", word: "Whole-grain choice", prompt: "Which whole grain did you pick?" },
+            { category: "Nutrition & Healthy Eating", word: "Fiber-rich bite", prompt: "What fiber-packed bite did you enjoy?" },
+            { category: "Nutrition & Healthy Eating", word: "Greek yogurt cup", prompt: "Did you have Greek yogurt? What flavor?" },
+            { category: "Nutrition & Healthy Eating", word: "Nut & seed handful", prompt: "Which nuts or seeds did you snack on?" },
+            { category: "Nutrition & Healthy Eating", word: "Avocado toast", prompt: "How did you top your avocado toast?" },
+            { category: "Nutrition & Healthy Eating", word: "Chickpea salad", prompt: "Any spices in your chickpea salad today?" },
+            { category: "Nutrition & Healthy Eating", word: "Oatmeal with berries", prompt: "What berries sprinkled on your oatmeal?" },
+            { category: "Nutrition & Healthy Eating", word: "Hummus & carrots", prompt: "Did you dip carrots or another veggie in hummus?" },
+            { category: "Nutrition & Healthy Eating", word: "Salmon serving", prompt: "How did you season or cook your salmon?" },
+            { category: "Nutrition & Healthy Eating", word: "Cottage cheese scoop", prompt: "Fruit mixed into your cottage cheese?" },
+            { category: "Nutrition & Healthy Eating", word: "Fortified cereal bowl", prompt: "What nutrient-boosted cereal did you choose?" },
+            { category: "Nutrition & Healthy Eating", word: "Lentil soup ladle", prompt: "Which spice made your lentil soup tasty?" },
+            { category: "Nutrition & Healthy Eating", word: "Smoothie sip", prompt: "What went into your smoothie blend?" },
+            { category: "Nutrition & Healthy Eating", word: "Spinach leaves", prompt: "Did you sneak spinach into a meal or smoothie?" },
+            { category: "Nutrition & Healthy Eating", word: "Sweet potato slice", prompt: "How did you prepare your sweet potato?" },
+            { category: "Nutrition & Healthy Eating", word: "Small meals", prompt: "What helps prevent heartburn when you eat small meals?" },
+            { category: "Hydration", word: "Sip water", prompt: "How many sips have you taken this hour?" },
+            { category: "Hydration", word: "6-cup mark", prompt: "Have you hit 6 cups of water yet today?" },
+            { category: "Hydration", word: "8-cup goal", prompt: "Are you on track for your 8-cup goal?" },
+            { category: "Hydration", word: "Infused water (fruit/herb)", prompt: "What flavor did you infuse your water with?" },
+            { category: "Hydration", word: "Refilled bottle", prompt: "When was the last time you refilled your water bottle?" },
+            { category: "Hydration", word: "Herbal tea cup", prompt: "Which herbal tea warmed you today?" },
+            { category: "Hydration", word: "Sparkling water sip", prompt: "Did you enjoy a bubbly sip of sparkling water?" },
+            { category: "Movement & Stretching", word: "Gentle walk", prompt: "How long was your gentle walk today?" },
+            { category: "Movement & Stretching", word: "Chair stretch", prompt: "Which seated stretch did you try?" },
+            { category: "Movement & Stretching", word: "Ankle circles", prompt: "How many ankle circles did you do?" },
+            { category: "Movement & Stretching", word: "Shoulder rolls", prompt: "Do shoulder rolls help you relax?" },
+            { category: "Movement & Stretching", word: "Prenatal yoga pose", prompt: "What yoga pose felt best today?" },
+            { category: "Movement & Stretching", word: "Arm raises", prompt: "How many arm raises did you complete?" },
+            { category: "Movement & Stretching", word: "Seated twist", prompt: "Did you try a seated twist for your spine?" },
+            { category: "Bonus Wellness", word: "Took a deep breath", prompt: "Where did you feel that deep breath in your body?" },
+            { category: "Bonus Wellness", word: "Brief mindfulness pause", prompt: "What did you notice during your mindfulness pause?" }
+        ];
+
+        let availableWords = [];
+        let calledWords = [];
+        let currentPlayerCard = []; // 2D array for words
+        let markedCells = []; // 2D boolean array
+        let achievedBingos = []; // Store strings identifying achieved bingo lines to prevent re-triggering for same line
+
+        // --- DOM Elements ---
+        const currentWordDisplay = document.getElementById('currentWordDisplay');
+        const currentPromptDisplay = document.getElementById('currentPromptDisplay');
+        const nextWordButton = document.getElementById('nextWordButton');
+        const calledWordsList = document.getElementById('calledWordsList');
+        const wordsRemainingDisplay = document.getElementById('wordsRemaining');
+        const qrcodeDisplay = document.getElementById('qrcodeDisplay');
+
+        const generateCardButton = document.getElementById('generateCardButton');
+        const bingoCardGrid = document.getElementById('bingoCardGrid');
+        const bingoMessage = document.getElementById('bingoMessage'); // Old message, replaced by modal
+        const bingoModal = document.getElementById('bingoModal');
+        const closeBingoModalButton = document.getElementById('closeBingoModal');
+
+        // --- Utility Functions ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // --- Host Functions ---
+        function initializeHostGame() {
+            availableWords = [...allWordsAndPrompts];
+            calledWords = [];
+            updateCalledWordsDisplay();
+            updateWordsRemainingDisplay();
+            currentWordDisplay.textContent = 'Click "Next Word" to start';
+            currentPromptDisplay.textContent = 'Discussion prompt will appear here.';
+            // Generate QR Code (links to the current page for this demo)
+            const qr = qrcode(0, 'L');
+            qr.addData(window.location.href); // In a real app, this would be a unique player join link
+            qr.make();
+            qrcodeDisplay.innerHTML = qr.createImgTag(4, 4);
+        }
+
+        function drawNextWord() {
+            if (availableWords.length === 0) {
+                currentWordDisplay.textContent = "Game Over!";
+                currentPromptDisplay.textContent = "All words have been called.";
+                nextWordButton.disabled = true;
+                updateWordsRemainingDisplay();
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * availableWords.length);
+            const drawnPair = availableWords.splice(randomIndex, 1)[0];
+            
+            calledWords.push(drawnPair);
+            currentWordDisplay.textContent = drawnPair.word;
+            currentPromptDisplay.textContent = drawnPair.prompt;
+            
+            updateCalledWordsDisplay();
+            updateWordsRemainingDisplay();
+
+            // "Broadcast" to player (in this single-page app, directly call player function)
+            if (currentPlayerCard.length > 0) { // Only if player card exists
+                 markWordOnPlayerCard(drawnPair.word);
+            }
+        }
+
+        function updateCalledWordsDisplay() {
+            calledWordsList.innerHTML = '';
+            calledWords.forEach(pair => {
+                const li = document.createElement('li');
+                li.textContent = pair.word;
+                calledWordsList.appendChild(li);
+            });
+        }
+         function updateWordsRemainingDisplay() {
+            wordsRemainingDisplay.textContent = `${availableWords.length} words remaining.`;
+        }
+
+
+        // --- Player Functions ---
+        function generatePlayerCard() {
+            achievedBingos = []; // Reset achieved bingos for new card
+            hideBingoModal(); // Hide modal if it was open
+            
+            let wordsForCard = shuffleArray([...allWordsAndPrompts]).slice(0, 24);
+            currentPlayerCard = [];
+            markedCells = [];
+            bingoCardGrid.innerHTML = ''; // Clear previous card
+
+            let wordIndex = 0;
+            for (let i = 0; i < 5; i++) {
+                let row = [];
+                let markedRow = [];
+                for (let j = 0; j < 5; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('bingo-card-cell');
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+
+                    if (i === 2 && j === 2) { // Center "FREE" space
+                        cell.textContent = "FREE";
+                        cell.classList.add('free-space', 'marked');
+                        row.push("FREE");
+                        markedRow.push(true);
+                    } else {
+                        const wordItem = wordsForCard[wordIndex++];
+                        cell.textContent = wordItem.word;
+                        row.push(wordItem.word);
+                        markedRow.push(false);
+                        cell.addEventListener('click', () => toggleMarkCell(cell, i, j));
+                    }
+                    bingoCardGrid.appendChild(cell);
+                }
+                currentPlayerCard.push(row);
+                markedCells.push(markedRow);
+            }
+            checkAllBingoConditions(); // Check initial state (for FREE space)
+        }
+        
+        // This function is for manual marking by player.
+        // Automatic marking happens via markWordOnPlayerCard when host calls a word.
+        function toggleMarkCell(cellElement, row, col) {
+            if (cellElement.textContent === "FREE") return; // Free space cannot be unmarked by click
+
+            markedCells[row][col] = !markedCells[row][col];
+            cellElement.classList.toggle('marked', markedCells[row][col]);
+            checkAllBingoConditions();
+        }
+
+        // This function is called when the HOST draws a word
+        function markWordOnPlayerCard(calledWord) {
+            let wordFoundAndMarked = false;
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 5; j++) {
+                    if (currentPlayerCard[i][j] === calledWord && !markedCells[i][j]) {
+                        markedCells[i][j] = true;
+                        const cellElement = bingoCardGrid.querySelector(`[data-row='${i}'][data-col='${j}']`);
+                        if (cellElement) {
+                            cellElement.classList.add('marked');
+                        }
+                        wordFoundAndMarked = true;
+                    }
+                }
+            }
+            if (wordFoundAndMarked) {
+                checkAllBingoConditions();
+            }
+        }
+        
+        function checkAllBingoConditions() {
+            // Clear previous bingo line highlights
+            document.querySelectorAll('.bingo-card-cell.bingo-line').forEach(cell => {
+                cell.classList.remove('bingo-line');
+            });
+            
+            let bingoFoundThisCheck = false;
+
+            const lines = [];
+            // Rows
+            for (let i = 0; i < 5; i++) {
+                lines.push({ type: 'row', index: i, cells: Array(5).fill(0).map((_, j) => ({r:i, c:j})) });
+            }
+            // Columns
+            for (let j = 0; j < 5; j++) {
+                 lines.push({ type: 'col', index: j, cells: Array(5).fill(0).map((_, i) => ({r:i, c:j})) });
+            }
+            // Diagonals
+            lines.push({ type: 'diag', index: 0, cells: Array(5).fill(0).map((_, i) => ({r:i, c:i})) }); // Top-left to bottom-right
+            lines.push({ type: 'diag', index: 1, cells: Array(5).fill(0).map((_, i) => ({r:i, c:4-i})) }); // Top-right to bottom-left
+
+            lines.forEach(line => {
+                const lineKey = `${line.type}-${line.index}`;
+                if (achievedBingos.includes(lineKey)) { // If this line already won, highlight it but don't re-notify
+                    line.cells.forEach(pos => {
+                        const cellEl = bingoCardGrid.querySelector(`[data-row='${pos.r}'][data-col='${pos.c}']`);
+                        if (cellEl) cellEl.classList.add('bingo-line');
+                    });
+                    return;
+                }
+
+                if (line.cells.every(pos => markedCells[pos.r][pos.c])) {
+                    bingoFoundThisCheck = true;
+                    achievedBingos.push(lineKey);
+                    line.cells.forEach(pos => {
+                        const cellEl = bingoCardGrid.querySelector(`[data-row='${pos.r}'][data-col='${pos.c}']`);
+                        if (cellEl) cellEl.classList.add('bingo-line');
+                    });
+                }
+            });
+
+            if (bingoFoundThisCheck && !achievedBingos.some(key => lines.find(l => `${l.type}-${l.index}` === key && achievedBingos.lastIndexOf(key) === achievedBingos.length -1 ))) {
+                 // Only show modal if a *new* bingo was found in this check cycle that wasn't the one just added.
+                 // More simply, if any new line has been added to achievedBingos in this check.
+                const newBingosThisCheck = lines.filter(line => {
+                    const lineKey = `${line.type}-${line.index}`;
+                    return achievedBingos.includes(lineKey) && (achievedBingos.filter(k => k === lineKey).length === 1); // Check if it's a newly added bingo
+                });
+
+                if (newBingosThisCheck.length > 0) {
+                    showBingoModal();
+                }
+            }
+        }
+
+        function showBingoModal() {
+            bingoModal.classList.remove('hidden');
+        }
+
+        function hideBingoModal() {
+            bingoModal.classList.add('hidden');
+        }
+
+        // --- Event Listeners ---
+        nextWordButton.addEventListener('click', drawNextWord);
+        generateCardButton.addEventListener('click', generatePlayerCard);
+        closeBingoModalButton.addEventListener('click', hideBingoModal);
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            initializeHostGame();
+            // Player can generate their card anytime.
+            // By default, no player card is shown until button is clicked.
+        };
+
+    </script>
+</body>
+</html>
