@@ -93,6 +93,12 @@
             max-height: 400px; /* Adjust as needed */
             overflow-y: auto;
         }
+        #bingoCountDisplay {
+            position: absolute;
+            top: 1rem; /* Adjust as needed */
+            right: 1rem; /* Adjust as needed */
+            z-index: 10; /* Ensure it's above other elements if needed */
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -133,9 +139,10 @@
             </div>
         </section>
 
-        <section id="playerView" class="bg-white p-6 rounded-lg shadow-lg mt-8">
-            <h1 class="text-3xl font-bold text-center mb-6 text-emerald-600">Player Bingo Card</h1>
-            <div class="text-center mb-6">
+        <section id="playerView" class="relative bg-white p-6 rounded-lg shadow-lg mt-8"> <div id="bingoCountDisplay" class="absolute top-4 right-4 bg-emerald-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg">
+                Bingos: 0
+            </div>
+            <h1 class="text-3xl font-bold text-center mb-6 text-emerald-600 pt-8 md:pt-0">Player Bingo Card</h1> <div class="text-center mb-6">
                 <button id="generateCardButton" class="button-secondary">Generate My Bingo Card</button>
             </div>
             <div id="bingoCardGrid" class="grid grid-cols-5 gap-1 md:gap-2 mx-auto w-full max-w-md md:max-w-lg">
@@ -213,6 +220,7 @@
         // --- DOM Elements ---
         const hostViewSection = document.getElementById('hostView'); 
         const playerViewSection = document.getElementById('playerView'); 
+        const bingoCountDisplay = document.getElementById('bingoCountDisplay'); // Added
 
         const currentWordDisplay = document.getElementById('currentWordDisplay');
         const currentPromptDisplay = document.getElementById('currentPromptDisplay');
@@ -241,23 +249,21 @@
             calledWords = [];
             updateCalledWordsDisplay();
             updateWordsRemainingDisplay();
-            currentWordDisplay.textContent = 'Click "Next Word" to start';
-            currentPromptDisplay.textContent = 'Discussion prompt will appear here.';
+            if(currentWordDisplay) currentWordDisplay.textContent = 'Click "Next Word" to start';
+            if(currentPromptDisplay) currentPromptDisplay.textContent = 'Discussion prompt will appear here.';
             
-            // Generate QR Code with "?view=player" parameter
-            const qr = qrcode(0, 'L'); // Error correction level
-            const baseURL = window.location.origin + window.location.pathname; // Base URL of the current page
+            const qr = qrcode(0, 'L'); 
+            const baseURL = window.location.origin + window.location.pathname; 
             const playerViewURL = baseURL + "?view=player";
             qr.addData(playerViewURL); 
             qr.make();
-            // Display the QR code image
-            if (qrcodeDisplay) qrcodeDisplay.innerHTML = qr.createImgTag(4, 4); // size, margin
+            if (qrcodeDisplay) qrcodeDisplay.innerHTML = qr.createImgTag(4, 4);
         }
 
         function drawNextWord() {
             if (availableWords.length === 0) {
-                currentWordDisplay.textContent = "Game Over!";
-                currentPromptDisplay.textContent = "All words have been called.";
+                if(currentWordDisplay) currentWordDisplay.textContent = "Game Over!";
+                if(currentPromptDisplay) currentPromptDisplay.textContent = "All words have been called.";
                 if (nextWordButton) nextWordButton.disabled = true;
                 updateWordsRemainingDisplay();
                 return;
@@ -273,8 +279,6 @@
             updateCalledWordsDisplay();
             updateWordsRemainingDisplay();
 
-            // This auto-marking is primarily for when host and player might be on the same browser instance (testing).
-            // For separate devices, players mark manually based on host's screen share.
             if (currentPlayerCard.length > 0) { 
                  markWordOnPlayerCard(drawnPair.word);
             }
@@ -293,13 +297,19 @@
             if (wordsRemainingDisplay) wordsRemainingDisplay.textContent = `${availableWords.length} words remaining.`;
         }
 
-
         // --- Player Functions ---
+        function updateBingoCountDisplay() { // New function
+            if (bingoCountDisplay) {
+                bingoCountDisplay.textContent = `Bingos: ${achievedBingos.length}`;
+            }
+        }
+
         function generatePlayerCard() {
             achievedBingos = []; 
+            updateBingoCountDisplay(); // Reset count display
             hideBingoModal(); 
             
-            let wordsForCard = shuffleArray([...allWordsAndPrompts]).slice(0, 24); // Get 24 unique words
+            let wordsForCard = shuffleArray([...allWordsAndPrompts]).slice(0, 24);
             currentPlayerCard = [];
             markedCells = [];
             if (bingoCardGrid) bingoCardGrid.innerHTML = ''; 
@@ -314,20 +324,19 @@
                     cell.dataset.row = i;
                     cell.dataset.col = j;
 
-                    if (i === 2 && j === 2) { // Center "FREE" space
+                    if (i === 2 && j === 2) { 
                         cell.textContent = "FREE";
                         cell.classList.add('free-space', 'marked');
                         rowWords.push("FREE");
                         rowMarkedStatus.push(true);
                     } else {
-                        if (wordIndex < wordsForCard.length) { // Ensure we don't go out of bounds
+                        if (wordIndex < wordsForCard.length) { 
                             const wordItem = wordsForCard[wordIndex++];
                             cell.textContent = wordItem.word;
                             rowWords.push(wordItem.word);
                             rowMarkedStatus.push(false);
                             cell.addEventListener('click', () => toggleMarkCell(cell, i, j));
                         } else {
-                            // Fallback if not enough words (should not happen with 24 words for 24 cells)
                             cell.textContent = "Error"; 
                             rowWords.push("Error");
                             rowMarkedStatus.push(false);
@@ -349,7 +358,6 @@
             checkAllBingoConditions();
         }
 
-        // This function is called when the HOST draws a word (for same-page auto-marking)
         function markWordOnPlayerCard(calledWord) {
             let wordFoundAndMarked = false;
             for (let i = 0; i < 5; i++) {
@@ -370,48 +378,44 @@
         }
         
         function checkAllBingoConditions() {
-            if (!bingoCardGrid || !markedCells || markedCells.length !== 5) return; // Basic safety checks
+            if (!bingoCardGrid || !markedCells || markedCells.length !== 5) return;
 
             document.querySelectorAll('.bingo-card-cell.bingo-line').forEach(cell => {
                 cell.classList.remove('bingo-line');
             });
             
-            let bingoFoundThisCheck = false;
+            let newBingoAchievedThisCheck = false; // Flag for new bingos in this specific check
             const lines = [];
-            // Rows
             for (let i = 0; i < 5; i++) {
                 lines.push({ type: 'row', index: i, cells: Array(5).fill(0).map((_, j) => ({r:i, c:j})) });
             }
-            // Columns
             for (let j = 0; j < 5; j++) {
                  lines.push({ type: 'col', index: j, cells: Array(5).fill(0).map((_, i) => ({r:i, c:j})) });
             }
-            // Diagonals
-            lines.push({ type: 'diag', index: 0, cells: Array(5).fill(0).map((_, i) => ({r:i, c:i})) }); // Top-left to bottom-right
-            lines.push({ type: 'diag', index: 1, cells: Array(5).fill(0).map((_, i) => ({r:i, c:4-i})) }); // Top-right to bottom-left
+            lines.push({ type: 'diag', index: 0, cells: Array(5).fill(0).map((_, i) => ({r:i, c:i})) }); 
+            lines.push({ type: 'diag', index: 1, cells: Array(5).fill(0).map((_, i) => ({r:i, c:4-i})) }); 
 
             lines.forEach(line => {
                 const lineKey = `${line.type}-${line.index}`;
-                // Check if all cells in the current line are marked
                 const isLineComplete = line.cells.every(pos => markedCells[pos.r] && markedCells[pos.r][pos.c]);
 
                 if (isLineComplete) {
-                    // Highlight the cells in this line
                     line.cells.forEach(pos => {
                         const cellEl = bingoCardGrid.querySelector(`[data-row='${pos.r}'][data-col='${pos.c}']`);
                         if (cellEl) cellEl.classList.add('bingo-line');
                     });
 
-                    // If this line hasn't been recorded as a bingo yet, record it and set flag
                     if (!achievedBingos.includes(lineKey)) {
-                        bingoFoundThisCheck = true;
+                        newBingoAchievedThisCheck = true; // A new bingo line was completed
                         achievedBingos.push(lineKey);
                     }
                 }
             });
+            
+            updateBingoCountDisplay(); // Update count display regardless of new bingo, as it reflects current state
 
-            if (bingoFoundThisCheck) {
-                 showBingoModal(); // Show modal for any new bingo
+            if (newBingoAchievedThisCheck) { // Only show modal if a *new* bingo was achieved in this check
+                 showBingoModal();
             }
         }
 
@@ -434,29 +438,29 @@
             const viewMode = urlParams.get('view');
 
             if (viewMode === 'player') {
-                // Player View Setup
                 if (hostViewSection) {
                     hostViewSection.style.display = 'none';
                 }
                 if (playerViewSection) {
-                    playerViewSection.style.marginTop = '0'; // Ensure no extra margin
-                    playerViewSection.classList.remove('mt-8'); // Explicitly remove Tailwind margin
+                    playerViewSection.style.marginTop = '0'; 
+                    playerViewSection.classList.remove('mt-8'); 
+                    // Make generate card button less prominent or hide if card auto-generates
+                    if(generateCardButton) generateCardButton.style.display = 'none'; 
                 }
-                // Automatically generate the card for the player
-                generatePlayerCard();
-                // Scroll to the player card section to ensure it's visible
+                generatePlayerCard(); // Auto-generate card for player
                 if (playerViewSection) {
-                    // Using 'auto' for behavior for instant scroll on load
                     playerViewSection.scrollIntoView({ behavior: 'auto', block: 'start' });
                 }
             } else {
-                // Host View Setup (default if no ?view=player)
                 if (hostViewSection) {
-                    initializeHostGame(); // This will set up host panel and QR code
+                    initializeHostGame(); 
                 }
-                // Player section remains visible for host to test or play,
-                // but card is not auto-generated for host. Host uses button.
+                 // For host view, player card is generated on button click
+                if(playerViewSection && generateCardButton) {
+                    generateCardButton.style.display = 'block'; // Ensure button is visible for host
+                }
             }
+            updateBingoCountDisplay(); // Initial call to set bingo count (likely 0)
         };
 
     </script>
