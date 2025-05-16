@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Virtual Wellness Bingo</title>
+    <title>Strong Moms, Safe Babies: Nutrition Bingo!</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -99,7 +99,7 @@
 
     <div class="container mx-auto max-w-6xl space-y-8">
         <section id="hostView" class="bg-white p-6 rounded-lg shadow-lg">
-            <h1 class="text-3xl font-bold text-center mb-6 text-blue-600">Wellness Bingo - Host Panel</h1>
+            <h1 class="text-3xl font-bold text-center mb-6 text-blue-600">Strong Moms, Safe Babies: Nutrition Bingo! - Host Panel</h1>
             
             <div class="grid md:grid-cols-3 gap-6 mb-6">
                 <div class="md:col-span-2 bg-blue-50 p-6 rounded-lg shadow">
@@ -211,8 +211,8 @@
         let achievedBingos = []; // Store strings identifying achieved bingo lines
 
         // --- DOM Elements ---
-        const hostViewSection = document.getElementById('hostView'); // Added
-        const playerViewSection = document.getElementById('playerView'); // Added
+        const hostViewSection = document.getElementById('hostView'); 
+        const playerViewSection = document.getElementById('playerView'); 
 
         const currentWordDisplay = document.getElementById('currentWordDisplay');
         const currentPromptDisplay = document.getElementById('currentPromptDisplay');
@@ -245,18 +245,20 @@
             currentPromptDisplay.textContent = 'Discussion prompt will appear here.';
             
             // Generate QR Code with "?view=player" parameter
-            const qr = qrcode(0, 'L');
-            const playerViewURL = window.location.href.split('?')[0] + "?view=player"; // Ensure clean base URL
+            const qr = qrcode(0, 'L'); // Error correction level
+            const baseURL = window.location.origin + window.location.pathname; // Base URL of the current page
+            const playerViewURL = baseURL + "?view=player";
             qr.addData(playerViewURL); 
             qr.make();
-            qrcodeDisplay.innerHTML = qr.createImgTag(4, 4);
+            // Display the QR code image
+            if (qrcodeDisplay) qrcodeDisplay.innerHTML = qr.createImgTag(4, 4); // size, margin
         }
 
         function drawNextWord() {
             if (availableWords.length === 0) {
                 currentWordDisplay.textContent = "Game Over!";
                 currentPromptDisplay.textContent = "All words have been called.";
-                nextWordButton.disabled = true;
+                if (nextWordButton) nextWordButton.disabled = true;
                 updateWordsRemainingDisplay();
                 return;
             }
@@ -265,22 +267,21 @@
             const drawnPair = availableWords.splice(randomIndex, 1)[0];
             
             calledWords.push(drawnPair);
-            currentWordDisplay.textContent = drawnPair.word;
-            currentPromptDisplay.textContent = drawnPair.prompt;
+            if (currentWordDisplay) currentWordDisplay.textContent = drawnPair.word;
+            if (currentPromptDisplay) currentPromptDisplay.textContent = drawnPair.prompt;
             
             updateCalledWordsDisplay();
             updateWordsRemainingDisplay();
 
-            // "Broadcast" to player (in this single-page app, directly call player function)
-            // This part is more relevant if host and player are on the same page instance.
-            // For separate devices, player marks manually.
-            // However, if a player *is* on the same page as host, this will still auto-mark.
+            // This auto-marking is primarily for when host and player might be on the same browser instance (testing).
+            // For separate devices, players mark manually based on host's screen share.
             if (currentPlayerCard.length > 0) { 
                  markWordOnPlayerCard(drawnPair.word);
             }
         }
 
         function updateCalledWordsDisplay() {
+            if (!calledWordsList) return;
             calledWordsList.innerHTML = '';
             calledWords.forEach(pair => {
                 const li = document.createElement('li');
@@ -289,7 +290,7 @@
             });
         }
          function updateWordsRemainingDisplay() {
-            wordsRemainingDisplay.textContent = `${availableWords.length} words remaining.`;
+            if (wordsRemainingDisplay) wordsRemainingDisplay.textContent = `${availableWords.length} words remaining.`;
         }
 
 
@@ -298,56 +299,64 @@
             achievedBingos = []; 
             hideBingoModal(); 
             
-            let wordsForCard = shuffleArray([...allWordsAndPrompts]).slice(0, 24);
+            let wordsForCard = shuffleArray([...allWordsAndPrompts]).slice(0, 24); // Get 24 unique words
             currentPlayerCard = [];
             markedCells = [];
-            bingoCardGrid.innerHTML = ''; 
+            if (bingoCardGrid) bingoCardGrid.innerHTML = ''; 
 
             let wordIndex = 0;
             for (let i = 0; i < 5; i++) {
-                let row = [];
-                let markedRow = [];
+                let rowWords = [];
+                let rowMarkedStatus = [];
                 for (let j = 0; j < 5; j++) {
                     const cell = document.createElement('div');
                     cell.classList.add('bingo-card-cell');
                     cell.dataset.row = i;
                     cell.dataset.col = j;
 
-                    if (i === 2 && j === 2) { 
+                    if (i === 2 && j === 2) { // Center "FREE" space
                         cell.textContent = "FREE";
                         cell.classList.add('free-space', 'marked');
-                        row.push("FREE");
-                        markedRow.push(true);
+                        rowWords.push("FREE");
+                        rowMarkedStatus.push(true);
                     } else {
-                        const wordItem = wordsForCard[wordIndex++];
-                        cell.textContent = wordItem.word;
-                        row.push(wordItem.word);
-                        markedRow.push(false);
-                        cell.addEventListener('click', () => toggleMarkCell(cell, i, j));
+                        if (wordIndex < wordsForCard.length) { // Ensure we don't go out of bounds
+                            const wordItem = wordsForCard[wordIndex++];
+                            cell.textContent = wordItem.word;
+                            rowWords.push(wordItem.word);
+                            rowMarkedStatus.push(false);
+                            cell.addEventListener('click', () => toggleMarkCell(cell, i, j));
+                        } else {
+                            // Fallback if not enough words (should not happen with 24 words for 24 cells)
+                            cell.textContent = "Error"; 
+                            rowWords.push("Error");
+                            rowMarkedStatus.push(false);
+                        }
                     }
-                    bingoCardGrid.appendChild(cell);
+                    if (bingoCardGrid) bingoCardGrid.appendChild(cell);
                 }
-                currentPlayerCard.push(row);
-                markedCells.push(markedRow);
+                currentPlayerCard.push(rowWords);
+                markedCells.push(rowMarkedStatus);
             }
             checkAllBingoConditions(); 
         }
         
         function toggleMarkCell(cellElement, row, col) {
-            if (cellElement.textContent === "FREE") return; 
+            if (cellElement.textContent === "FREE" || !markedCells[row] || typeof markedCells[row][col] === 'undefined') return; 
 
             markedCells[row][col] = !markedCells[row][col];
             cellElement.classList.toggle('marked', markedCells[row][col]);
             checkAllBingoConditions();
         }
 
+        // This function is called when the HOST draws a word (for same-page auto-marking)
         function markWordOnPlayerCard(calledWord) {
             let wordFoundAndMarked = false;
             for (let i = 0; i < 5; i++) {
                 for (let j = 0; j < 5; j++) {
-                    if (currentPlayerCard[i][j] === calledWord && !markedCells[i][j]) {
+                    if (currentPlayerCard[i] && currentPlayerCard[i][j] === calledWord && markedCells[i] && !markedCells[i][j]) {
                         markedCells[i][j] = true;
-                        const cellElement = bingoCardGrid.querySelector(`[data-row='${i}'][data-col='${j}']`);
+                        const cellElement = bingoCardGrid ? bingoCardGrid.querySelector(`[data-row='${i}'][data-col='${j}']`) : null;
                         if (cellElement) {
                             cellElement.classList.add('marked');
                         }
@@ -361,66 +370,63 @@
         }
         
         function checkAllBingoConditions() {
+            if (!bingoCardGrid || !markedCells || markedCells.length !== 5) return; // Basic safety checks
+
             document.querySelectorAll('.bingo-card-cell.bingo-line').forEach(cell => {
                 cell.classList.remove('bingo-line');
             });
             
             let bingoFoundThisCheck = false;
             const lines = [];
+            // Rows
             for (let i = 0; i < 5; i++) {
                 lines.push({ type: 'row', index: i, cells: Array(5).fill(0).map((_, j) => ({r:i, c:j})) });
             }
+            // Columns
             for (let j = 0; j < 5; j++) {
                  lines.push({ type: 'col', index: j, cells: Array(5).fill(0).map((_, i) => ({r:i, c:j})) });
             }
-            lines.push({ type: 'diag', index: 0, cells: Array(5).fill(0).map((_, i) => ({r:i, c:i})) }); 
-            lines.push({ type: 'diag', index: 1, cells: Array(5).fill(0).map((_, i) => ({r:i, c:4-i})) }); 
+            // Diagonals
+            lines.push({ type: 'diag', index: 0, cells: Array(5).fill(0).map((_, i) => ({r:i, c:i})) }); // Top-left to bottom-right
+            lines.push({ type: 'diag', index: 1, cells: Array(5).fill(0).map((_, i) => ({r:i, c:4-i})) }); // Top-right to bottom-left
 
             lines.forEach(line => {
                 const lineKey = `${line.type}-${line.index}`;
-                if (achievedBingos.includes(lineKey)) { 
-                    line.cells.forEach(pos => {
-                        const cellEl = bingoCardGrid.querySelector(`[data-row='${pos.r}'][data-col='${pos.c}']`);
-                        if (cellEl) cellEl.classList.add('bingo-line');
-                    });
-                    return;
-                }
+                // Check if all cells in the current line are marked
+                const isLineComplete = line.cells.every(pos => markedCells[pos.r] && markedCells[pos.r][pos.c]);
 
-                if (line.cells.every(pos => markedCells[pos.r][pos.c])) {
-                    bingoFoundThisCheck = true;
-                    achievedBingos.push(lineKey);
+                if (isLineComplete) {
+                    // Highlight the cells in this line
                     line.cells.forEach(pos => {
                         const cellEl = bingoCardGrid.querySelector(`[data-row='${pos.r}'][data-col='${pos.c}']`);
                         if (cellEl) cellEl.classList.add('bingo-line');
                     });
+
+                    // If this line hasn't been recorded as a bingo yet, record it and set flag
+                    if (!achievedBingos.includes(lineKey)) {
+                        bingoFoundThisCheck = true;
+                        achievedBingos.push(lineKey);
+                    }
                 }
             });
 
             if (bingoFoundThisCheck) {
-                const newBingosThisCheck = lines.filter(line => {
-                    const lineKey = `${line.type}-${line.index}`;
-                    // Check if this lineKey is in achievedBingos and was just added (count is 1)
-                    return achievedBingos.includes(lineKey) && (achievedBingos.filter(k => k === lineKey).length === 1);
-                });
-
-                if (newBingosThisCheck.length > 0) {
-                    showBingoModal();
-                }
+                 showBingoModal(); // Show modal for any new bingo
             }
         }
 
         function showBingoModal() {
-            bingoModal.classList.remove('hidden');
+            if (bingoModal) bingoModal.classList.remove('hidden');
         }
 
         function hideBingoModal() {
-            bingoModal.classList.add('hidden');
+            if (bingoModal) bingoModal.classList.add('hidden');
         }
 
         // --- Event Listeners ---
-        nextWordButton.addEventListener('click', drawNextWord);
-        generateCardButton.addEventListener('click', generatePlayerCard);
-        closeBingoModalButton.addEventListener('click', hideBingoModal);
+        if (nextWordButton) nextWordButton.addEventListener('click', drawNextWord);
+        if (generateCardButton) generateCardButton.addEventListener('click', generatePlayerCard);
+        if (closeBingoModalButton) closeBingoModalButton.addEventListener('click', hideBingoModal);
 
         // --- Initial Setup ---
         window.onload = () => {
@@ -428,15 +434,29 @@
             const viewMode = urlParams.get('view');
 
             if (viewMode === 'player') {
-                if(hostViewSection) hostViewSection.style.display = 'none';
-                if(playerViewSection) playerViewSection.style.marginTop = '0'; // Remove top margin if host view is hidden
-                // Optionally, auto-generate card for player view
-                // generatePlayerCard(); 
+                // Player View Setup
+                if (hostViewSection) {
+                    hostViewSection.style.display = 'none';
+                }
+                if (playerViewSection) {
+                    playerViewSection.style.marginTop = '0'; // Ensure no extra margin
+                    playerViewSection.classList.remove('mt-8'); // Explicitly remove Tailwind margin
+                }
+                // Automatically generate the card for the player
+                generatePlayerCard();
+                // Scroll to the player card section to ensure it's visible
+                if (playerViewSection) {
+                    // Using 'auto' for behavior for instant scroll on load
+                    playerViewSection.scrollIntoView({ behavior: 'auto', block: 'start' });
+                }
             } else {
-                // Default host view: initialize host game components
-                if(hostViewSection) initializeHostGame();
+                // Host View Setup (default if no ?view=player)
+                if (hostViewSection) {
+                    initializeHostGame(); // This will set up host panel and QR code
+                }
+                // Player section remains visible for host to test or play,
+                // but card is not auto-generated for host. Host uses button.
             }
-            // Player can always generate their card if the playerView section is visible
         };
 
     </script>
